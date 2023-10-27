@@ -18,15 +18,15 @@ load_dotenv()
 
 USE_OPENAI=False
 
-# FIRST_MODEL="dolphin2.1-mistral"
-FIRST_MODEL="mistral"
+FIRST_MODEL="dolphin2.1-mistral"
+# FIRST_MODEL="mistral"
 # FIRST_MODEL="nexusraven"
 FIRST_TEMP=0.4
 # SECOND_MODEL="llama2-uncensored"
 # SECOND_MODEL="mistral-openorca"
 # SECOND_MODEL="zephyr"
-SECOND_MODEL="mistral"
-# SECOND_MODEL="dolphin2.1-mistral"
+# SECOND_MODEL="mistral"
+SECOND_MODEL="dolphin2.1-mistral"
 # SECOND_MODEL="everythinglm"
 # SECOND_MODEL="nexusraven"
 SECOND_TEMP=0.9
