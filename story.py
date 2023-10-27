@@ -3,35 +3,72 @@ from datetime import datetime
 from langchain.llms import Ollama
 from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler 
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    AIMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
+from langchain.schema import AIMessage, HumanMessage, SystemMessage
+from dotenv import load_dotenv
 
-FIRST_MODEL="mistral"
+
+load_dotenv()
+
+USE_OPENAI=False
+
+FIRST_MODEL="dolphin2.1-mistral"
+# FIRST_MODEL="mistral"
 # FIRST_MODEL="nexusraven"
 FIRST_TEMP=0.4
 # SECOND_MODEL="llama2-uncensored"
 # SECOND_MODEL="mistral-openorca"
 # SECOND_MODEL="zephyr"
-SECOND_MODEL="mistral"
+# SECOND_MODEL="mistral"
+SECOND_MODEL="dolphin2.1-mistral"
 # SECOND_MODEL="everythinglm"
 # SECOND_MODEL="nexusraven"
 SECOND_TEMP=0.9
 
-# Initialize Ollama
-llm = Ollama(
-    # model="zephyr", 
-    # model="wizard-vicuna-uncensored", 
-    # model="mistral", 
-    # model="mistral-openorca", 
-    # model="llama2-uncensored", 
-    model=FIRST_MODEL,
-    temperature = FIRST_TEMP,
-    callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-)
+if USE_OPENAI:
+    llm = ChatOpenAI(
+        temperature=.5,
+        model_name='gpt-4'
+    )
+else:
+
+    # Initialize Ollama
+    llm = Ollama(
+        # model="zephyr", 
+        # model="wizard-vicuna-uncensored", 
+        # model="mistral", 
+        # model="mistral-openorca", 
+        # model="llama2-uncensored", 
+        model=FIRST_MODEL,
+        temperature = FIRST_TEMP,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
 
 # Get the current datetime once for the session
 session_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 def llm_log(prompt):
-    response = llm(prompt)
+
+    # chat(messages)
+    if USE_OPENAI:
+        messages = [
+            SystemMessage(
+                content="You are the world's best AI novelist beating out Stephen King on creativity."
+            ),
+            HumanMessage(
+                content=prompt
+            ),
+        ]
+        response = llm(messages).content
+    else:
+        response = llm(prompt) # ollama
+
     session_filename = f"session-{session_datetime}.txt"
     with open(session_filename, "a") as session_file:
         session_file.write(f"\n{'='*20} PROMPT {'='*20}\n")
@@ -76,12 +113,17 @@ def extract_and_parse_json(string_data):
 
 
 # Constants and templates
-PLOT = """A dark scifi tale of a grizzled solo astronaut, Bob, encountering a derelict alien ship in deep space. Aliens arrive and destroy his ship while he is exploring the derelict. He must use cunning to restore the engines on the derelict ship while playing dead all to escape."""
+# PLOT = """A dark scifi tale of a grizzled solo astronaut, Bob, encountering a derelict alien ship in deep space. Aliens arrive and destroy his ship while he is exploring the derelict. He must use cunning to restore the engines on the derelict ship while playing dead all to escape."""
+PLOT = """An atheist mom, Gena, and her loving young daughter, Megan, have a wonderful life that is turned upside
+when an evil presence slowly possesses Megan that causes her to do vile and depraved acts.
+She becomes a danger to everybody around her.
+The mom turns to medicine which fails them, and finally an exorcist from the Catholic church 
+tries to save them from the demon."""
 
 
-PLOT = llm_log("Turn this simple plot into an amazing story synopsis full of intrigue and flavor "
-               "by writing a ONE PARAGRAPH SUMMARY:\n\n"
-               f"{PLOT}"
+PLOT = llm_log("Turn this simple plot into an amazing story synopsis full of intrigue and flavor " +
+               "by writing a ONE PARAGRAPH SUMMARY:\n\n" +
+               f"{PLOT}" +
                "\n\nREMINDER: WRITE ONLY A ONE PARAGRAPH SUMMARY!"
 )
 
@@ -158,12 +200,12 @@ def get_book_data(text):
 text = llm_log(CHAPTERS_TEMPLATE)
 book_data = get_book_data(text)
 
-print(">>> NEW MODEL CHANGE <<<")
-llm = Ollama(
-    model=SECOND_MODEL,
-    temperature = SECOND_TEMP,
-    callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-)
+# print(">>> NEW MODEL CHANGE <<<")
+# llm = Ollama(
+#     model=SECOND_MODEL,
+#     temperature = SECOND_TEMP,
+#     callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+# )
 
 with open(f"chapters-{session_datetime}.json", 'w') as file:
     json.dump(book_data.get('chapters', []), file, indent=4)
