@@ -18,15 +18,15 @@ load_dotenv()
 
 USE_OPENAI=False
 
-FIRST_MODEL="dolphin2.1-mistral"
-# FIRST_MODEL="mistral"
+# FIRST_MODEL="dolphin2.1-mistral"
+FIRST_MODEL="mistral"
 # FIRST_MODEL="nexusraven"
 FIRST_TEMP=0.4
 # SECOND_MODEL="llama2-uncensored"
 # SECOND_MODEL="mistral-openorca"
 # SECOND_MODEL="zephyr"
-# SECOND_MODEL="mistral"
-SECOND_MODEL="dolphin2.1-mistral"
+SECOND_MODEL="mistral"
+# SECOND_MODEL="dolphin2.1-mistral"
 # SECOND_MODEL="everythinglm"
 # SECOND_MODEL="nexusraven"
 SECOND_TEMP=0.9
@@ -174,7 +174,23 @@ CHAPTERS_TEMPLATE = (
     "prompt": "The group sets out, facing their first set of challenges including hostile encounters with other survivor groups and natural obstacles. The harsh reality of the journey begins to test the group’s resolve.",
   }}
 ]
-}}"""     
+}}
+// SECOND JSON EXAMPLE (YOU WILL CREATE 10 CHAPTERS)
+{{
+"chapters": [
+{{
+"chapter": 1,
+"title": "The Derelict Ship",
+"prompt": "Bob ventures into the unknown depths of space in search of his next adventure. He stumbles upon a derelict alien ship, long abandoned and left to rot in the cold vacuum of the void."
+}},
+{{
+"chapter": 2,
+"title": "The Sinister Presence",
+"prompt": "As Bob delves deeper into the derelict, he realizes that he is not alone. A sinister presence lurks within the ship, and before he knows it, his own ship has been destroyed by a sudden, devastating attack from an unknown enemy."
+}}
+]
+}}
+"""     
 ).format(PLOT.replace('{', '{{').replace('}', '}}'))
 
 
