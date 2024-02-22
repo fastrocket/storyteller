@@ -18,19 +18,9 @@ load_dotenv()
 
 USE_OPENAI=False
 
-# FIRST_MODEL="pdevine/yarn-llama2"
-FIRST_MODEL="dolphin2.1-mistral"
-# FIRST_MODEL="mistral"
-# FIRST_MODEL="nexusraven"
+FIRST_MODEL="dolphin-mistral"
 FIRST_TEMP=0.7
-# SECOND_MODEL="llama2-uncensored"
-# SECOND_MODEL="mistral-openorca"
-# SECOND_MODEL="zephyr"
-# SECOND_MODEL="mistral"
-# SECOND_MODEL="pdevine/yarn-llama2"
-SECOND_MODEL="dolphin2.1-mistral"
-# SECOND_MODEL="everythinglm"
-# SECOND_MODEL="nexusraven"
+SECOND_MODEL=FIRST_MODEL
 SECOND_TEMP=0.9
 
 if USE_OPENAI:
@@ -38,16 +28,17 @@ if USE_OPENAI:
         temperature=.5,
         model_name='gpt-4'
     )
+
+    # import openai 
+
+    # client = openai.OpenAI( base_url="https://localhost:44333/v1", api_key = "no-key-required" ) 
+    
 else:
 
     # Initialize Ollama
     llm = Ollama(
-        # model="zephyr", 
-        # model="wizard-vicuna-uncensored", 
-        # model="mistral", 
-        # model="mistral-openorca", 
-        # model="llama2-uncensored", 
-        repeat_penalty=1.4, # prevent infinite repetitions?
+        repeat_penalty=1.4, # help prevent repetitions
+        num_predict=8000,
         model=FIRST_MODEL,
         temperature = FIRST_TEMP,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
