@@ -18,10 +18,16 @@ load_dotenv()
 
 USE_OPENAI=False
 
-FIRST_MODEL="dolphin-mistral"
+# FIRST_MODEL="smollm2:1.7b"
+# FIRST_MODEL="granite3-dense"
+FIRST_MODEL="granite3-moe:latest"
+# FIRST_MODEL="dolphin-mistral"
 FIRST_TEMP=0.7
 SECOND_MODEL=FIRST_MODEL
 SECOND_TEMP=0.9
+
+# Near the top where other models are defined
+JSON_MODEL = "qwen2.5-coder:1.5b"  # or another model that's good with structured output
 
 if USE_OPENAI:
     llm = ChatOpenAI(
@@ -41,6 +47,13 @@ else:
         num_predict=8000,
         model=FIRST_MODEL,
         temperature = FIRST_TEMP,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+    llmJson = Ollama(
+        repeat_penalty=1.4,
+        num_predict=8000,
+        model=JSON_MODEL,
+        temperature=0.1,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
@@ -202,14 +215,14 @@ def get_book_data(text):
         except (json.JSONDecodeError, ValueError) as e:
             retries += 1
             print(f"Error: {e}. Attempt {retries} of {MAX_RETRIES}. Retrying...")
-            text = llm_log(CHAPTERS_TEMPLATE)
+            text = llmJson(CHAPTERS_TEMPLATE)
 
     # If we've exhausted our retries and still have an error:
     raise Exception("Failed to decode and validate JSON after multiple retries.")
 
 
 # Generate JSON structure with chapter prompts
-text = llm_log(CHAPTERS_TEMPLATE)
+text = llmJson(CHAPTERS_TEMPLATE)
 book_data = get_book_data(text)
 
 # print(">>> NEW MODEL CHANGE <<<")
