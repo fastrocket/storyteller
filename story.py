@@ -32,7 +32,7 @@ JSON_MODEL = "qwen2.5-coder:1.5b"  # or another model that's good with structure
 SUMMARY_MODEL="smollm2:360m"  # Added this constant
 
 # Near the top with other constants
-NUM_CHAPTERS = 15  # Set number of chapters here
+NUM_CHAPTERS = 25  # Set number of chapters here
 
 if USE_OPENAI:
     llm = ChatOpenAI(
@@ -218,7 +218,7 @@ def get_book_data(text):
                     "Ensure all property names and values are properly quoted. " +
                     "The response must start with '{' and end with '}'. " +
                     "Do not use line continuations or trailing commas. " +
-                    f"You MUST include exactly {NUM_CHAPTERS} chapters. " +  # Added explicit chapter count
+                    f"You MUST include exactly {NUM_CHAPTERS} chapters. " +
                     "Each string value must be on a single line."
                 )
             
@@ -234,7 +234,25 @@ def get_book_data(text):
             text = text.replace(',}', '}').replace(',\n}', '}').replace(',\n  }', '}')
             
             last_response = text  # Store the last response
-            return extract_and_parse_json(text)
+            
+            # Try to parse the JSON first
+            parsed_data = json.loads(text)
+            
+            # Then validate the number of chapters
+            chapters = parsed_data.get('chapters', [])
+            if len(chapters) < NUM_CHAPTERS:
+                print(f"Got {len(chapters)} chapters but expected {NUM_CHAPTERS}. Retrying...")
+                retries += 1
+                continue
+                
+            # Validate chapter contents
+            for chapter in chapters:
+                if not isinstance(chapter.get('title'), str) or not chapter.get('title'):
+                    raise ValueError(f"'title' in chapter {chapter.get('chapter')} is missing or not a string.")
+                if not isinstance(chapter.get('prompt'), str) or not chapter.get('prompt'):
+                    raise ValueError(f"'prompt' in chapter {chapter.get('chapter')} is missing or not a string.")
+            
+            return parsed_data
             
         except (json.JSONDecodeError, ValueError) as e:
             last_error = e
