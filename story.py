@@ -32,7 +32,7 @@ JSON_MODEL = "qwen2.5-coder:1.5b"  # or another model that's good with structure
 SUMMARY_MODEL="smollm2:360m"  # Added this constant
 
 # Near the top with other constants
-NUM_CHAPTERS = 5  # Set number of chapters here
+NUM_CHAPTERS = 15  # Set number of chapters here
 
 if USE_OPENAI:
     llm = ChatOpenAI(
@@ -205,6 +205,9 @@ MAX_RETRIES = 5
 
 def get_book_data(text):
     retries = 0
+    last_error = None
+    last_response = None
+    
     while retries < MAX_RETRIES:
         try:
             # Add a more strict JSON prompt
@@ -215,6 +218,7 @@ def get_book_data(text):
                     "Ensure all property names and values are properly quoted. " +
                     "The response must start with '{' and end with '}'. " +
                     "Do not use line continuations or trailing commas. " +
+                    f"You MUST include exactly {NUM_CHAPTERS} chapters. " +  # Added explicit chapter count
                     "Each string value must be on a single line."
                 )
             
@@ -228,19 +232,25 @@ def get_book_data(text):
             text = text.replace('\\\n', ' ')
             # Remove any trailing commas before closing brackets
             text = text.replace(',}', '}').replace(',\n}', '}').replace(',\n  }', '}')
-                
+            
+            last_response = text  # Store the last response
             return extract_and_parse_json(text)
             
         except (json.JSONDecodeError, ValueError) as e:
+            last_error = e
             retries += 1
             print(f"Error: {e}. Attempt {retries} of {MAX_RETRIES}. Retrying...")
-            if retries == MAX_RETRIES:
-                print("Failed all retry attempts. Last response received:")
-                print(text)
-                raise Exception("Failed to decode and validate JSON after multiple retries.")
+            
         except KeyboardInterrupt:
             print("\nOperation interrupted by user. Exiting gracefully...")
             sys.exit(0)
+    
+    # If we get here, all retries failed
+    print("\nFailed all retry attempts. Last response received:")
+    print(last_response)
+    print("\nLast error encountered:")
+    print(last_error)
+    raise Exception("Failed to decode and validate JSON after multiple retries.")
 
 
 # Generate JSON structure with chapter prompts
