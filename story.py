@@ -12,6 +12,7 @@ from langchain.prompts.chat import (
 )
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
 from dotenv import load_dotenv
+import sys
 
 
 load_dotenv()
@@ -28,6 +29,9 @@ SECOND_TEMP=0.9
 
 # Near the top where other models are defined
 JSON_MODEL = "qwen2.5-coder:1.5b"  # or another model that's good with structured output
+
+# Near the top with other constants
+NUM_CHAPTERS = 5  # Set number of chapters here
 
 if USE_OPENAI:
     llm = ChatOpenAI(
@@ -101,11 +105,12 @@ def extract_and_parse_json(string_data):
     stripped_text = strip_text_around_json(string_data)
     parsed_data = json.loads(stripped_text)
     
-    # Confirm that there are at least 10 chapters with non-empty 'title' and 'prompt' fields
+    # Confirm that there are NUM_CHAPTERS chapters with non-empty 'title' and 'prompt' fields
     chapters = parsed_data.get('chapters', [])
-    if len(chapters) < 10:
-        raise Exception("Insufficient number of chapters.")
-        # Ensure 'title' and 'prompt' fields in each chapter are strings
+    if len(chapters) < NUM_CHAPTERS:
+        raise Exception(f"Insufficient number of chapters. Expected {NUM_CHAPTERS}, got {len(chapters)}.")
+    
+    # Ensure 'title' and 'prompt' fields in each chapter are strings
     for chapter in chapters:
         if not isinstance(chapter.get('title'), str):
             raise ValueError(f"'title' in chapter {chapter.get('chapter')} is not a string.")
@@ -155,7 +160,7 @@ ACTIVE_PROMPT_TEMPLATE = (
 ).format(PLOT)
 
 CHAPTERS_TEMPLATE = (
-    "WRITE 10 CHAPTER SUMMARIES AS JSON and ONLY JSON! No commentary. "
+    f"WRITE {NUM_CHAPTERS} CHAPTER SUMMARIES AS JSON and ONLY JSON! No commentary. "
     "Here is the plot: {}\n\nONLY OUTPUT VALID JSON!!!\n\n"
     "RULES: Divide the aforementioned plot into chapters, each serving as a pivotal piece of the "
     "narrative puzzle. "
@@ -170,7 +175,7 @@ CHAPTERS_TEMPLATE = (
     "Ensure a coherent flow throughout, leading to a climactic chapter "
     "where the core conflict escalates to its peak, followed by a resolution chapter "
     "that ties up the narrative threads and leaves a lasting impression on the reader."""
-    "\n\nEXAMPLES OF THE EXPECTED JSON STRUCTURE (YOU WILL CREATE 10 CHAPTERS):\n"
+    "\n\nEXAMPLES OF THE EXPECTED JSON STRUCTURE (YOU WILL CREATE {} CHAPTERS):\n"
     """{{
 "chapters": [{{
     "chapter": 1, 
@@ -180,27 +185,11 @@ CHAPTERS_TEMPLATE = (
   {{
     "chapter": 2,
     "title": "The Road to Desolation",
-    "prompt": "The group sets out, facing their first set of challenges including hostile encounters with other survivor groups and natural obstacles. The harsh reality of the journey begins to test the group’s resolve.",
+    "prompt": "The group sets out, facing their first set of challenges including hostile encounters with other survivor groups and natural obstacles. The harsh reality of the journey begins to test the group's resolve.",
   }}
 ]
-}}
-// SECOND JSON EXAMPLE (YOU WILL CREATE 10 CHAPTERS)
-{{
-"chapters": [
-{{
-"chapter": 1,
-"title": "The Derelict Ship",
-"prompt": "Bob ventures into the unknown depths of space in search of his next adventure. He stumbles upon a derelict alien ship, long abandoned and left to rot in the cold vacuum of the void."
-}},
-{{
-"chapter": 2,
-"title": "The Sinister Presence",
-"prompt": "As Bob delves deeper into the derelict, he realizes that he is not alone. A sinister presence lurks within the ship, and before he knows it, his own ship has been destroyed by a sudden, devastating attack from an unknown enemy."
-}}
-]
-}}
-"""     
-).format(PLOT.replace('{', '{{').replace('}', '}}'))
+}}"""     
+).format(PLOT.replace('{', '{{').replace('}', '}}'), NUM_CHAPTERS)
 
 
 
@@ -210,15 +199,40 @@ def get_book_data(text):
     retries = 0
     while retries < MAX_RETRIES:
         try:
+            # Add a more strict JSON prompt
+            if retries > 0:
+                text = llmJson(
+                    CHAPTERS_TEMPLATE + 
+                    "\n\nIMPORTANT: You must return ONLY valid JSON. No other text. " +
+                    "Ensure all property names and values are properly quoted. " +
+                    "The response must start with '{' and end with '}'. " +
+                    "Do not use line continuations or trailing commas. " +
+                    "Each string value must be on a single line."
+                )
+            
+            # Enhanced JSON cleaning
+            text = text.strip()
+            # Remove any text before the first {
+            text = text[text.find('{'):]
+            # Remove any text after the last }
+            text = text[:text.rfind('}')+1]
+            # Replace any line continuations
+            text = text.replace('\\\n', ' ')
+            # Remove any trailing commas before closing brackets
+            text = text.replace(',}', '}').replace(',\n}', '}').replace(',\n  }', '}')
+                
             return extract_and_parse_json(text)
-        
+            
         except (json.JSONDecodeError, ValueError) as e:
             retries += 1
             print(f"Error: {e}. Attempt {retries} of {MAX_RETRIES}. Retrying...")
-            text = llmJson(CHAPTERS_TEMPLATE)
-
-    # If we've exhausted our retries and still have an error:
-    raise Exception("Failed to decode and validate JSON after multiple retries.")
+            if retries == MAX_RETRIES:
+                print("Failed all retry attempts. Last response received:")
+                print(text)
+                raise Exception("Failed to decode and validate JSON after multiple retries.")
+        except KeyboardInterrupt:
+            print("\nOperation interrupted by user. Exiting gracefully...")
+            sys.exit(0)
 
 
 # Generate JSON structure with chapter prompts
