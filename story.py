@@ -29,6 +29,7 @@ SECOND_TEMP=0.9
 
 # Near the top where other models are defined
 JSON_MODEL = "qwen2.5-coder:1.5b"  # or another model that's good with structured output
+SUMMARY_MODEL="smollm2:360m"  # Added this constant
 
 # Near the top with other constants
 NUM_CHAPTERS = 5  # Set number of chapters here
@@ -58,6 +59,13 @@ else:
         num_predict=8000,
         model=JSON_MODEL,
         temperature=0.1,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+    llmSummary = Ollama(  # Added this initialization
+        repeat_penalty=1.4,
+        num_predict=2000,  # Reduced since summaries are shorter
+        model=SUMMARY_MODEL,
+        temperature=0.3,  # Lower temperature for more focused summaries
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
@@ -272,7 +280,7 @@ with open(story_filename, "w", encoding="utf-8") as f:
             summary_prompt = (f"Please summarize the following story chapters: {future_prompts_concatenated}" +
                             "\n\nREMEMBER: WRITE A BRIEF ONE PARAGRAPH SUMMARY ONLY!!"
             )
-            summary_of_future_chapters = llm_log(summary_prompt)
+            summary_of_future_chapters = llmSummary(summary_prompt)
 
 
         chapter_info = f"\n\nSTORY_SO_FAR: {running_summary}\nCHAPTER_TITLE: {title}\nTHIS_CHAPTER_BLUEPRINT: {prompt}"
@@ -287,12 +295,13 @@ with open(story_filename, "w", encoding="utf-8") as f:
         else:
             print(f"\n>>>>> POST SUMMARY {num} {title}\n\n")
             
-            running_summary_update = ("You are GptSummaryPro: Summarize the story so far and new chapter to aid in writing the next chapter. Retain important people, places, and things:\n\n" + "THE SUMMARY SHOULD BE VERY BRIEF AND ONLY CONTAIN RELEVANT PLOT ELEMENTS TO HELP CRAFT THE NEXT CHAPTER. " 
+            running_summary_update = ("Summarize the story so far and new chapter to aid in writing the next chapter. " 
+                                    + "Retain important people, places, and things:\n\n" 
                                     + "\n\nThe story so far: " + running_summary 
                                     + "\n\nNew chapter: " + generated_chapter 
-                                    + "\n\nREMEMBER: WRITE A BRIEF SUMMARY PARAGRAPH ONLY, NO COMMENTARY OR META INFO!!!"
+                                    + "\n\nREMEMBER: WRITE A BRIEF SUMMARY PARAGRAPH ONLY!!!"
             )
-            running_summary = llm_log(running_summary_update)
+            running_summary = llmSummary(running_summary_update)
 
         f.write(f"\n\n{title}\n\n{generated_chapter}")
 
