@@ -32,7 +32,7 @@ JSON_MODEL = "qwen2.5-coder:1.5b"  # or another model that's good with structure
 SUMMARY_MODEL="smollm2:360m"  # Added this constant
 
 # Near the top with other constants
-NUM_CHAPTERS = 25  # Set number of chapters here
+NUM_CHAPTERS = 10  # Set number of chapters here
 
 if USE_OPENAI:
     llm = ChatOpenAI(
@@ -210,47 +210,55 @@ def get_book_data(text):
     
     while retries < MAX_RETRIES:
         try:
-            # Add a more strict JSON prompt
+            # Add a more strict JSON prompt with explicit structure
             if retries > 0:
-                text = llmJson(
-                    CHAPTERS_TEMPLATE + 
-                    "\n\nIMPORTANT: You must return ONLY valid JSON. No other text. " +
-                    "Ensure all property names and values are properly quoted. " +
-                    "The response must start with '{' and end with '}'. " +
-                    "Do not use line continuations or trailing commas. " +
-                    f"You MUST include exactly {NUM_CHAPTERS} chapters. " +
-                    "Each string value must be on a single line."
+                strict_prompt = (
+                    f"Generate a valid JSON structure with exactly {NUM_CHAPTERS} chapters. Use this exact format:\n"
+                    '{\n"chapters": [\n'
+                    '    {\n'
+                    '        "chapter": 1,\n'
+                    '        "title": "Chapter Title",\n'
+                    '        "prompt": "Chapter prompt text"\n'
+                    '    },\n'
+                    '    ...\n'
+                    ']}\n\n'
+                    "RULES:\n"
+                    f"1. Must have exactly {NUM_CHAPTERS} chapters\n"
+                    "2. Each chapter must have exactly these three fields\n"
+                    "3. No comments or extra text\n"
+                    "4. All strings must be properly quoted\n"
+                    "5. Must be valid JSON\n\n"
+                    f"{CHAPTERS_TEMPLATE}"
                 )
+                text = llmJson(strict_prompt)
             
-            # Enhanced JSON cleaning
+            # Clean up the JSON text
             text = text.strip()
-            # Remove any text before the first {
-            text = text[text.find('{'):]
-            # Remove any text after the last }
-            text = text[:text.rfind('}')+1]
-            # Replace any line continuations
-            text = text.replace('\\\n', ' ')
-            # Remove any trailing commas before closing brackets
-            text = text.replace(',}', '}').replace(',\n}', '}').replace(',\n  }', '}')
+            # Find the first { and last }
+            start = text.find('{')
+            end = text.rfind('}') + 1
+            if start == -1 or end == 0:
+                raise ValueError("No JSON object found in response")
+            text = text[start:end]
             
-            last_response = text  # Store the last response
-            
-            # Try to parse the JSON first
+            # Parse the JSON
             parsed_data = json.loads(text)
             
-            # Then validate the number of chapters
-            chapters = parsed_data.get('chapters', [])
-            if len(chapters) < NUM_CHAPTERS:
-                print(f"Got {len(chapters)} chapters but expected {NUM_CHAPTERS}. Retrying...")
-                retries += 1
-                continue
-                
-            # Validate chapter contents
+            # Validate structure
+            if 'chapters' not in parsed_data:
+                raise ValueError("Missing 'chapters' key in JSON")
+            
+            chapters = parsed_data['chapters']
+            if len(chapters) != NUM_CHAPTERS:
+                raise ValueError(f"Expected {NUM_CHAPTERS} chapters, got {len(chapters)}")
+            
+            # Validate each chapter
             for chapter in chapters:
-                if not isinstance(chapter.get('title'), str) or not chapter.get('title'):
-                    raise ValueError(f"'title' in chapter {chapter.get('chapter')} is missing or not a string.")
-                if not isinstance(chapter.get('prompt'), str) or not chapter.get('prompt'):
-                    raise ValueError(f"'prompt' in chapter {chapter.get('chapter')} is missing or not a string.")
+                required_fields = {'chapter', 'title', 'prompt'}
+                if not all(field in chapter for field in required_fields):
+                    raise ValueError(f"Chapter {chapter.get('chapter', '?')} missing required fields")
+                if not all(isinstance(chapter.get(field), str) for field in ['title', 'prompt']):
+                    raise ValueError(f"Chapter {chapter.get('chapter', '?')} has invalid string fields")
             
             return parsed_data
             
@@ -263,9 +271,8 @@ def get_book_data(text):
             print("\nOperation interrupted by user. Exiting gracefully...")
             sys.exit(0)
     
-    # If we get here, all retries failed
     print("\nFailed all retry attempts. Last response received:")
-    print(last_response)
+    print(text)
     print("\nLast error encountered:")
     print(last_error)
     raise Exception("Failed to decode and validate JSON after multiple retries.")
