@@ -19,9 +19,13 @@ load_dotenv()
 
 USE_OPENAI=False
 
+MAX_RETRIES = 20
+
+
 # FIRST_MODEL="smollm2:1.7b"
 # FIRST_MODEL="granite3-dense"
-FIRST_MODEL="granite3-moe:latest"
+FIRST_MODEL="qwen2.5-coder:1.5b"
+# FIRST_MODEL="granite3-moe:latest"
 # FIRST_MODEL="dolphin-mistral"
 FIRST_TEMP=0.7
 SECOND_MODEL=FIRST_MODEL
@@ -29,7 +33,8 @@ SECOND_TEMP=0.9
 
 # Near the top where other models are defined
 JSON_MODEL = "qwen2.5-coder:1.5b"  # or another model that's good with structured output
-SUMMARY_MODEL="smollm2:360m"  # Added this constant
+SUMMARY_MODEL="qwen2.5-coder:1.5b"  # Added this constant
+# SUMMARY_MODEL="smollm2:360m"  # Added this constant
 
 # Near the top with other constants
 NUM_CHAPTERS = 10  # Set number of chapters here
@@ -46,26 +51,29 @@ if USE_OPENAI:
     
 else:
 
-    # Initialize Ollama
-    llm = Ollama(
-        repeat_penalty=1.4, # help prevent repetitions
+    # Initialize Ollama - only create new instances for different models/settings
+    base_llm = Ollama(
+        repeat_penalty=1.4,
         num_predict=8000,
         model=FIRST_MODEL,
-        temperature = FIRST_TEMP,
+        temperature=FIRST_TEMP,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-    llmJson = Ollama(
+    
+    # Reuse base_llm if models are the same
+    llm = base_llm
+    llmJson = base_llm if JSON_MODEL == FIRST_MODEL else Ollama(
         repeat_penalty=1.4,
         num_predict=8000,
         model=JSON_MODEL,
         temperature=0.1,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-    llmSummary = Ollama(  # Added this initialization
+    llmSummary = base_llm if SUMMARY_MODEL == FIRST_MODEL else Ollama(
         repeat_penalty=1.4,
-        num_predict=2000,  # Reduced since summaries are shorter
+        num_predict=2000,
         model=SUMMARY_MODEL,
-        temperature=0.3,  # Lower temperature for more focused summaries
+        temperature=0.3,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
@@ -133,7 +141,43 @@ def extract_and_parse_json(string_data):
 
 
 # Constants and templates
-PLOT="""Think of a random and unique story that can be surreal, horror, trippy, or anything and amp it up to 10. Give it a beginning, middle, end. Introduce the characters lazily, and have an impactful climax."""
+PLOT = """Create a unique, compelling story following these guidelines:
+
+1. SETTING & GENRE: Choose ONE:
+- Modern psychological horror
+- Dark science fiction
+- Supernatural thriller
+- Surreal contemporary drama
+
+2. STRUCTURE:
+- Strong hook in the opening
+- Clear 3-act structure (setup, confrontation, resolution)
+- Rising tension throughout
+- Impactful climax
+- Satisfying yet thought-provoking ending
+
+3. CHARACTERS:
+- 2-3 main characters with clear motivations
+- Introduce them naturally through actions and dialogue
+- Give them distinct voices and behaviors
+- Create meaningful character arcs
+
+4. WRITING STYLE:
+- Active voice only
+- Show through actions, dialogue, and sensory details
+- No exposition dumps
+- Tight pacing
+- Vivid, specific descriptions
+- Natural dialogue that reveals character
+
+5. TONE:
+- Dark, tense atmosphere
+- Building sense of dread
+- Psychological depth
+- Grounded despite supernatural/sci-fi elements
+
+Craft a ONE PARAGRAPH synopsis that captures these elements while leaving room for creative expansion.
+"""
 
 # PLOT = """A dark scifi tale of a grizzled solo astronaut, Bob, encountering a derelict alien ship in deep space. Aliens arrive and destroy his ship while he is exploring the derelict. He must use cunning to restore the engines on the derelict ship while playing dead all to escape."""
 # PLOT = """An atheist mom, Gena, and her loving young daughter, Megan, have a wonderful life that is turned upside
@@ -201,7 +245,6 @@ CHAPTERS_TEMPLATE = (
 
 
 
-MAX_RETRIES = 5
 
 def get_book_data(text):
     retries = 0
